@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>College Job Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:Poppins;}
+body{background:#f4f6f9;}
+
+/* LOGIN */
+.login-container{
+width:350px;margin:120px auto;background:#fff;padding:40px;border-radius:12px;
+box-shadow:0 10px 30px rgba(0,0,0,0.08);}
+.login-container h2{text-align:center;margin-bottom:25px;}
+input,select{width:100%;padding:12px;margin-bottom:15px;border-radius:6px;border:1px solid #ccc;}
+button{width:100%;padding:12px;border:none;background:#4a6cf7;color:white;border-radius:6px;cursor:pointer;}
+button:hover{background:#3556e8;}
+
+/* DASHBOARD */
+.dashboard{display:none;height:100vh;}
+
+/* SIDEBAR */
+.sidebar{width:220px;background:#1e293b;color:white;padding:20px;}
+.sidebar h2{margin-bottom:30px;font-size:20px;}
+.sidebar button{width:100%;background:none;border:none;color:white;text-align:left;padding:12px;cursor:pointer;border-radius:6px;}
+.sidebar button:hover{background:#334155;}
+.content{flex:1;padding:30px;overflow:auto;}
+.section{display:none;}
+.active{display:block;}
+
+/* JOB CARD */
+.job-card{background:white;padding:20px;border-radius:10px;margin-bottom:15px;box-shadow:0 4px 10px rgba(0,0,0,0.05);}
+.job-card h3{color:#4a6cf7;margin-bottom:10px;}
+.job-card button{width:auto;margin-top:10px;}
+
+/* POST JOB */
+.form-box{max-width:500px;background:white;padding:20px;border-radius:10px;box-shadow:0 4px 10px rgba(0,0,0,0.05);}
+textarea{width:100%;padding:10px;border:1px solid #ccc;border-radius:6px;margin-bottom:10px;}
+.logout{margin-top:30px;background:#ef4444;}
+</style>
+</head>
+
+<body>
+
+<!-- LOGIN -->
+<div class="login-container" id="loginPage">
+<h2>College Job Portal</h2>
+<form onsubmit="loginUser(event)">
+<input type="email" id="email" placeholder="Email" required>
+<input type="password" id="password" placeholder="Password" required>
+<select id="role" required>
+<option value="">Select Role</option>
+<option value="student">Student</option>
+<option value="recruiter">Recruiter</option>
+</select>
+<button type="submit">Login</button>
+</form>
+</div>
+
+<!-- DASHBOARD -->
+<div class="dashboard" id="dashboard">
+<div class="sidebar">
+<h2>Job Portal</h2>
+<button onclick="showSection('jobsSection')">Available Jobs</button>
+<button onclick="showSection('postSection')" id="postBtn">Post Job</button>
+<button onclick="showSection('appSection')">Applications</button>
+<button class="logout" onclick="logout()">Logout</button>
+</div>
+
+<div class="content">
+
+<!-- JOBS -->
+<div id="jobsSection" class="section">
+<h2>Jobs</h2>
+<div id="jobList"></div>
+</div>
+
+<!-- POST JOB -->
+<div id="postSection" class="section">
+<h2>Post New Job</h2>
+<div class="form-box">
+<input type="text" id="jobTitle" placeholder="Job Title">
+<input type="text" id="company" placeholder="Company">
+<input type="text" id="location" placeholder="Location">
+<input type="text" id="salary" placeholder="Salary">
+<textarea id="description" placeholder="Job Description"></textarea>
+<button onclick="postJob()">Post Job</button>
+</div>
+</div>
+
+<!-- APPLICATIONS -->
+<div id="appSection" class="section">
+<h2>My Applications</h2>
+
+<!-- Resume upload container for students only -->
+<div id="resumeUploadContainer" style="display:none;">
+<h3>Upload Resume</h3>
+<input type="file" id="resumeFile" accept=".pdf,.doc,.docx">
+<button onclick="uploadResume()">Upload Resume</button>
+<br><br>
+</div>
+
+<div id="applicationsList"></div>
+</div>
+
+</div>
+</div>
+
+<script>
+let roleType="";
+
+function showSection(id){
+document.querySelectorAll(".section").forEach(sec=>{sec.classList.remove("active");});
+document.getElementById(id).classList.add("active");
+if(id==="jobsSection") loadJobs();
+if(id==="appSection") loadMyApplications();
+}
+
+async function loginUser(event){
+event.preventDefault();
+const email=document.getElementById("email").value;
+const password=document.getElementById("password").value;
+const role=document.getElementById("role").value;
+
+let url="";
+if(role==="student") url="/api/auth/login-student";
+if(role==="recruiter") url="/api/auth/login-recruiter";
+
+const res=await fetch(url,{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({email,password})
+});
+const data=await res.json();
+
+if(res.ok){
+roleType=role;
+localStorage.setItem("studentEmail",email);
+
+document.getElementById("loginPage").style.display="none";
+document.getElementById("dashboard").style.display="flex";
+
+// Show Post Job only for recruiters
+document.getElementById("postBtn").style.display = (role==="recruiter") ? "block" : "none";
+
+// Show Resume Upload only for students
+document.getElementById("resumeUploadContainer").style.display = (role==="student") ? "block" : "none";
+
+showSection("jobsSection");
+}else{
+alert(data.message);
+}
+}
+
+function logout(){
+localStorage.clear();
+document.getElementById("dashboard").style.display="none";
+document.getElementById("loginPage").style.display="block";
+}
+
+/* LOAD JOBS */
+async function loadJobs(){
+const res=await fetch("/api/jobs");
+const jobs=await res.json();
+const container=document.getElementById("jobList");
+container.innerHTML="";
+jobs.forEach(job=>{
+container.innerHTML+=`
+<div class="job-card">
+<h3>${job.title}</h3>
+<p><b>Company:</b> ${job.company}</p>
+<p><b>Location:</b> ${job.location}</p>
+<p><b>Salary:</b> ${job.salary}</p>
+<p>${job.description}</p>
+${roleType==="student" ? `<button onclick="applyJob('${job._id}')">Apply</button>` : ""}
+</div>`;
+});
+}
+
+/* APPLY JOB */
+async function applyJob(jobId){
+const email=localStorage.getItem("studentEmail");
+const res=await fetch("/api/applications/apply",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({studentEmail:email,jobId})
+});
+const data=await res.json();
+alert(data.message);
+}
+
+/* LOAD APPLICATIONS */
+async function loadMyApplications(){
+const email=localStorage.getItem("studentEmail");
+const res=await fetch(`/api/applications/my-applications/${email}`);
+const apps=await res.json();
+const container=document.getElementById("applicationsList");
+container.innerHTML="";
+if(apps.length===0){ container.innerHTML="<p>No Applications</p>"; return; }
+apps.forEach(app=>{
+container.innerHTML+=`
+<div class="job-card">
+<p><b>Job ID:</b> ${app.jobId}</p>
+<p><b>Date:</b> ${new Date(app.appliedDate).toDateString()}</p>
+</div>`;
+});
+}
+
+/* POST JOB */
+async function postJob(){
+const title=document.getElementById("jobTitle").value;
+const company=document.getElementById("company").value;
+const location=document.getElementById("location").value;
+const salary=document.getElementById("salary").value;
+const description=document.getElementById("description").value;
+
+const res=await fetch("/api/jobs/create",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({title,company,location,salary,description})
+});
+const data=await res.json();
+alert(data.message);
+}
+
+/* UPLOAD RESUME */
+async function uploadResume(){
+try{
+const fileInput = document.getElementById("resumeFile");
+const file = fileInput.files[0];
+const email = localStorage.getItem("studentEmail");
+
+if(!email){ alert("Student not logged in"); return; }
+if(!file){ alert("Please select a resume file"); return; }
+
+const formData = new FormData();
+formData.append("resume", file);
+formData.append("email", email);
+
+const res = await fetch("/api/student/upload-resume", {
+method: "POST",
+body: formData
+});
+
+if(!res.ok) throw new Error("Upload failed");
+
+const data = await res.json();
+alert(data.message);
+
+// Clear input
+fileInput.value = "";
+}catch(error){
+console.error(error);
+alert("Resume upload failed");
+}
+}
+</script>
+</body>
+</html>
